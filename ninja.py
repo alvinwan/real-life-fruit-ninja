@@ -18,7 +18,6 @@ class Ninja:
         self.probability_shape_spawn = 0.05
         self.height = height
         self.width = width
-        self.board = np.zeros((height, width))
 
     def update(self):
         for i, shape in enumerate(self.shapes):
@@ -28,7 +27,7 @@ class Ninja:
 
         if np.random.random() < self.probability_shape_spawn:
             x = int(np.random.random() * self.width)
-            self.add_circle(x, 50)
+            self.add_circle(x, 10)
 
         for shape in self.garbage:
             if shape in self.shapes:
@@ -39,20 +38,33 @@ class Ninja:
         for shape in self.shapes:
             shape['draw'](frame, shape['y'])
 
+    def check(self, mag, ang, frame):
+        """Check if any of the shapes have been touched.
+
+        (In the future, check if any have been sliced.)
+        """
+        ys, xs = np.nonzero(mag > 35)
+        self.any_strike(xs, ys)
+        for x, y in zip(xs, ys):
+            cv2.circle(frame, (x, y), 5, (0, 255, 0), -1)
+
     def add_circle(self, x: int, r: int, color: tuple=(0, 0, 255), vy: int=10):
         self.shapes.append({
             'x': x,
             'y': 0,
             'vy': vy,
             'draw': lambda frame, y: cv2.circle(frame, (x, y), r, color, -1),
-            'touch': lambda x, y, shape: \
-                dist(x, shape['x'], y, shape['y']) <= r,
+            'any_touch': lambda x, y, shape: \
+                (dist(x, shape['x'], y, shape['y']) <= r).any(),
         })
 
-    def on_mouse(self, event, x, y, flags, param):
+    def any_strike(self, x, y):
         for i, shape in enumerate(self.shapes):
-            if shape['touch'](x, y, shape):
+            if shape['any_touch'](x, y, shape):
                 self.garbage.append(shape)
+
+    def on_mouse(self, event, x, y, flags, param):
+        self.any_strike(x, y)
 
     def bind_mouse_callback(self):
         cv2.namedWindow(self.frame_name)
@@ -68,9 +80,8 @@ if __name__ == '__main__':
         _, frame = cap.read()
         frame = cv2.resize(frame, (640, 420))
 
-        game.board = frame
         game.update()
-        game.draw(game.board)
-        cv2.imshow(game.frame_name, game.board)
+        game.draw(frame)
+        cv2.imshow(game.frame_name, frame)
         if cv2.waitKey(1) & 0xff == ord('q'):
             break
